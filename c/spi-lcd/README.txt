@@ -34,4 +34,12 @@ application, but may also be controlled manually...
   echo high >  /sys/class/gpio/gpio85/direction
     
   
-  
+The kernel must have the ST7565P driver enabled for lcd-helper to work.
+Run "make menuconfig".  Navigate to:
+	Device Drivers ->  Graphics support
+and select "M" for "Support for frame buffer devices", then navigate to 
+that menu item, and select "M" for "ST7565P Virtual Frame Buffer support".
+Also, enable "Video Mode Handling Helpers".  Save and exit, and build the 
+kernel and modules.  After the board boots the new kernel, run...
+   modprobe ts-st7565p-fb
+
