@@ -1,4 +1,4 @@
-/*  Copyright 2004-2012, Unpublished Work of Technologic Systems
+/*  Copyright 2016, Unpublished Work of Technologic Systems
 *  All Rights Reserved.
 *
 *  THIS WORK IS AN UNPUBLISHED WORK AND CONTAINS CONFIDENTIAL,
@@ -19,7 +19,7 @@
 /* To compile tshwctl, use the appropriate cross compiler and run the
 * command:
 *
-*  gcc -fno-tree-cselim -Wall -O0 -mcpu=arm9 -o tshwctl tshwctl.c
+*  gcc -fno-tree-cselim -Wall -O0 -mcpu=arm9 -o tshwctl tshwctl.c gpiolib.c
 *
 */
 
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 
 	model = get_model();
 	if(model != 0x7553) {
-		fprintf(stderr, "Unsupported model %d\n", model);
+		fprintf(stderr, "Unsupported model TS-%X\n", model);
 		return 1;
 	}
 
@@ -151,7 +151,6 @@ int main(int argc, char **argv)
 		printf("model=0x%X\n", model);
 		gpio_export(44);
 		printf("bootmode=0x%X\n", gpio_read(44) ? 1 : 0);
-		//printf("fpga_revision=0x%X\n", fpeek8(twifd, 0x7F));
 	}
 
 	if(baud > -1) {
