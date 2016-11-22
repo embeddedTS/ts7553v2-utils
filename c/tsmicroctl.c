@@ -68,7 +68,7 @@ int silabs_init()
 	fd = open("/dev/i2c-0", O_RDWR);
 	if(fd != -1) {
 		if (ioctl(fd, I2C_SLAVE_FORCE, 0x78) < 0) {
-			perror("FPGA did not ACK 0x78\n");
+			perror("Microcontroller did not ACK 0x78\n");
 			return -1;
 		}
 	}
@@ -164,6 +164,7 @@ int main(int argc, char **argv)
 	model = get_model();
 	switch(model) {
 	  case 0x7680:
+	  case 0x7682:
 	  case 0x7400:
 	  case 0x7553:
 		break;
