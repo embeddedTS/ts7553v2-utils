@@ -19,7 +19,7 @@
 
 #define DEBUG 0
 
-#define SPI_DEVNAME   "/dev/spidev1.0"
+#define SPI_DEVNAME   "/dev/spidev2.0"
 
 typedef enum {
    BACKLIGHT_OFF=0,
@@ -43,20 +43,15 @@ static void sighup_handler(int signum) {
 	signal(signum, sighup_handler);
 }
 
-static volatile unsigned long *pinctrl;
-
 #ifndef MAX
 #define MAX(x,y)  ((x)>(y)?x:y)
 #endif
 
-
 #define LCD_WIDTH    128
 #define LCD_HEIGHT   64
 
-
-
 static int checkHelperIsRunning(void);
-static int spi_fd;
+static int spi_fd, lcdReset_fd, lcdCmd_fd, lcdBacklight_fd;
 static unsigned char data[8][LCD_WIDTH];
 
 static unsigned int xRes, yRes, bitsPerPixel, stride;
@@ -94,29 +89,29 @@ static inline void clearPixel(unsigned int x, unsigned int y) {
 }
 
 static void lcd_backlight(backlight_t state)
-{
+{   
    if (state == BACKLIGHT_ON)
-      pinctrl[0x724 / 4] = (1 << 21);  // set GPIO 2.21 (#85) 
+      write(lcdBacklight_fd, "1\n", 2);
    else
-      pinctrl[0x728 / 4] = (1 << 21);  // clr
-}
+      write(lcdBacklight_fd, "0\n", 2);
+}      
 
 
 static void lcd_reset(lcd_reset_t state)
 {
    if (state == LCD_RESETN_ACTIVE)
-      pinctrl[0x728 / 4] = (1 << 20);  // clr GPIO 2.20 (#84)
+      write(lcdReset_fd, "0\n", 2);
    else
-      pinctrl[0x724 / 4] = (1 << 20);  // set   
+      write(lcdReset_fd, "1\n", 2);     
 }
 
 
 static void lcd_data_cmd_select(cmdData_t state)
 {
    if (state == DATA_LUN) 
-      pinctrl[0x724 / 4] = (1 << 4);   // set GPIO 2.4 (#68)
+      write(lcdCmd_fd, "1\n", 2);
    else
-      pinctrl[0x728 / 4] = (1 << 4);   // clr
+      write(lcdCmd_fd, "0\n", 2);      
 }
 
 static void displayUpdateFunction(void) {
@@ -131,33 +126,24 @@ static void displayUpdateFunction(void) {
    int status;
 
    signal(SIGHUP, sighup_handler); // send me a SIGHUP and I'll exit!
-   
-   // output enables...
-   pinctrl[0xb24 / 4] = (1 << 20) | (1 << 21) | (1 << 4);
-   // pull-up enables...
-   pinctrl[0x624 / 4] = (1 << 20) | (1 << 21) | (1 << 4) | 
-                        (1 << 5) | (1 << 6) | (1 << 7);
-   // drive strength & voltage...
-   pinctrl[0x388 / 4] = (3 << 16) | (3 << 20) | (3 << 24);
-   pinctrl[0x384 / 4] = (6 << 16) | (6 << 20) | (6 << 24); 
 
-   
    lcd_reset(LCD_RESETN_ACTIVE);
    usleep(50000);
    lcd_reset(LCD_RESETN_INACTIVE);
    usleep(50000);
    lcd_backlight(BACKLIGHT_ON);
+
    memset((void*)frameBuffer, 0, bufferSize);
-      
-   *previousFrameBuffer = 1;  // to force initial lcd update 
-   
+
+   *previousFrameBuffer = 1;  // to force initial lcd update
+
 	lcd_data_cmd_select(CMD_LUN);
    spi_mode = SPI_CPHA | SPI_CPOL;
    ioctl(spi_fd, SPI_IOC_WR_MODE, &spi_mode);
    spi_bits = 8;
    ioctl(spi_fd, SPI_IOC_WR_BITS_PER_WORD, &spi_bits);
    ioctl(spi_fd, SPI_IOC_RD_BITS_PER_WORD, &spi_bits);
-   spi_speed = 4000000;
+   spi_speed = 5000000;
    ioctl(spi_fd, SPI_IOC_WR_MAX_SPEED_HZ, &spi_speed);
 
    memset(xfer, 0, sizeof(xfer));
@@ -168,25 +154,26 @@ static void displayUpdateFunction(void) {
    xfer[0].len = sizeof(initString);
    xfer[1].rx_buf = 0;
 	xfer[1].len = 0;
-         
+
    if ((status = ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer)) < 0) {
-      fprintf(stderr, "Error sending init string to LCD\n");      
+      fprintf(stderr, "Error sending init string to LCD\n");
       return;
    }
 
    while(! gotHUP) {
       usleep(50000);    // approx 20Hz refresh
-            
+
       if (! memcmp((void*)frameBuffer, previousFrameBuffer, bufferSize))
          continue;
-                  
-      memcpy(previousFrameBuffer, (void*)frameBuffer, bufferSize);      
-                        
+
+      memcpy(previousFrameBuffer, (void*)frameBuffer, bufferSize);
+
       switch(bitsPerPixel) {
-      case 1:                  
-         {  
+      case 1:
+         {
             int bit;
             volatile unsigned char *ucp;
+
             for(y=0; y < yRes; y++) {
                for(x=0; x < xRes; ) {
                   unsigned long offset = (y * stride) + x/8;
@@ -197,32 +184,32 @@ static void displayUpdateFunction(void) {
                      if (*ucp & bit)
                         setPixel(x, y);
                      else
-                        clearPixel(x,y);                        
+                        clearPixel(x,y);
                   }
                }
             }
-         }         
+         }
          break;
-         
+
       default:
          printf("%d bits-per-pixel not handled yet!\n", bitsPerPixel);
          break;
       }
 
-      for(i=0; i < 8; i++) {               
-         lcd_data_cmd_select(CMD_LUN);      
+      for(i=0; i < 8; i++) {
+         lcd_data_cmd_select(CMD_LUN);
          c = i | 0xb0;   // set page
          xfer[0].tx_buf = (unsigned long)&c;
-         xfer[0].len = 1;   
-         ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer);      
+         xfer[0].len = 1;
+         ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer);
          c = 0;         // set column to zero
-         ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer);                 
+         ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer);
          c = 0x10;
          ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer);
          lcd_data_cmd_select(DATA_LUN);
          xfer[0].tx_buf = (unsigned long)&data[i];
          xfer[0].len = LCD_WIDTH;
-         ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer);   
+         ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer);
       }
    }
 
@@ -243,15 +230,55 @@ int main(void) {
       fprintf(stderr, "lcd-helper is running already\n");
       return 1;
    }
-        
-   fd = open("/dev/mem", O_RDWR|O_SYNC);   
-   pinctrl = (unsigned long *)mmap(0, 8192, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0x80018000);
- 
-   if (pinctrl == MAP_FAILED) {
-      fprintf(stderr, "ERROR: Cannot mmap regs\n");
+
+   if ((fd = open("/sys/class/gpio/export",  O_WRONLY|O_SYNC)) < 0) {
+      fprintf(stderr, "Can't open /sys/class/gpio/export\n");
       return 1;
    }
-     
+   write(fd, "107\n", 4);
+   write(fd, "112\n", 4);
+   write(fd, "121\n", 4);
+   close(fd);
+
+   if ((fd = open("/sys/class/gpio/gpio107/direction",  O_RDWR|O_SYNC)) < 0) {
+      fprintf(stderr, "Can't open /sys/class/gpio/gpio107/direction\n");
+      return 1;
+   }
+   write(fd, "out\n", 4);
+   close(fd);
+
+   if ((fd = open("/sys/class/gpio/gpio112/direction",  O_RDWR|O_SYNC)) < 0) {
+      fprintf(stderr, "Can't open /sys/class/gpio/gpio112/direction\n");
+      return 1;
+   }
+   write(fd, "out\n", 4);
+   close(fd);
+
+   if ((fd = open("/sys/class/gpio/gpio121/direction",  O_RDWR|O_SYNC)) < 0) {
+      fprintf(stderr, "Can't open /sys/class/gpio/gpio121/direction\n");
+      return 1;
+   }
+   write(fd, "out\n", 4);
+   close(fd);
+
+   if ((lcdReset_fd = open("/sys/class/gpio/gpio107/value",  O_RDWR|O_SYNC)) < 0) {
+   fprintf(stderr, "Can't open /sys/class/gpio/gpio107/value\n");
+      return 1;
+   }
+
+   if ((lcdCmd_fd = open("/sys/class/gpio/gpio112/value",  O_RDWR|O_SYNC)) < 0) {
+   fprintf(stderr, "Can't open /sys/class/gpio/gpio112/value\n");
+      return 1;
+   }
+
+   if ((lcdBacklight_fd = open("/sys/class/gpio/gpio121/value",  O_RDWR|O_SYNC)) < 0) {
+   fprintf(stderr, "Can't open /sys/class/gpio/gpio121/value\n");
+      return 1;
+   }
+
+   fd = open("/dev/mem", O_RDWR|O_SYNC);
+
+   
    if((dir = opendir("/sys/class/graphics")) == NULL) {
       fprintf(stderr, "ERROR: Cannot access /sys/class/graphics\n");
       return 1;
@@ -260,7 +287,7 @@ int main(void) {
    while((ent = readdir(dir)) != NULL) {
       snprintf(name, 16, "/dev/%s", ent->d_name);
       fb_fd = open(name, O_RDWR);
-      ioctl(fb_fd, FBIOGET_FSCREENINFO, &fixed_info);      
+      ioctl(fb_fd, FBIOGET_FSCREENINFO, &fixed_info);
       ioctl(fb_fd, FBIOGET_VSCREENINFO, &screen_info);
 
       xRes = screen_info.xres;
@@ -269,25 +296,24 @@ int main(void) {
       if(xRes == LCD_WIDTH && yRes == LCD_HEIGHT) break;
       close(fb_fd);
    }
-        
+
    if(fb_fd > 0 && ent != NULL) {
-      
       bitsPerPixel = screen_info.bits_per_pixel;
       stride = fixed_info.line_length;
       bufferSize = screen_info.yres_virtual *  stride;
-      
+
 #if (DEBUG)      
-      printf("Display: %dx%dx%d stride: %d bufferSize: %d bytes\n", 
-         xRes, yRes, bitsPerPixel, stride, bufferSize);            
+      printf("Display: %dx%dx%d stride: %d bufferSize: %d bytes\n",
+         xRes, yRes, bitsPerPixel, stride, bufferSize);
 #endif
 
-      if ((previousFrameBuffer = malloc(bufferSize)) == NULL) {   
+      if ((previousFrameBuffer = malloc(bufferSize)) == NULL) {
          fprintf(stderr, "Memory allocation error\n");
          close(fb_fd);
          return 1;
       }
-      
-      frameBuffer = mmap(NULL, MAX(getpagesize(), bufferSize), 
+
+      frameBuffer = mmap(NULL, MAX(getpagesize(), bufferSize),
          PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED, fb_fd, 0);
       if (frameBuffer == MAP_FAILED) {
          fprintf(stderr, "MAP_FAILED\n");
@@ -296,7 +322,8 @@ int main(void) {
       }
 
       if ((spi_fd = open(SPI_DEVNAME, O_RDWR | O_SYNC)) < 0) {
-         fprintf(stderr, "Failed to open %s\n", SPI_DEVNAME);
+         fprintf(stderr, "Failed to open %s\n"
+            "(Did you forget to modprobe spidev?)\n", SPI_DEVNAME);
          close(fb_fd);
          exit(1);
       }
@@ -306,14 +333,15 @@ int main(void) {
          close(fb_fd);
          close(spi_fd);
          return 1;
-      } 
-      
+      }
+
       displayUpdateFunction();
-      close(fb_fd);      
+      close(fb_fd);
       close(spi_fd);
-      
+
    } else {
-      fprintf(stderr, "ERROR: Can't open fb device\n");
+      fprintf(stderr, "ERROR: Can't open fb device\n"
+         "(Did you forget to modprobe ts-st7565p-fb?)\n");
       return 1;
    }
 
@@ -325,7 +353,7 @@ static int checkHelperIsRunning(void) {
 	struct dirent entry, *ep;
 	DIR *dp;
 	int retVal = 0;
-	
+
 	if ((dp = opendir("/proc"))) {
 		for (ret = readdir_r(dp, &entry, &ep); retVal == 0 && ret == 0 && ep
 				!= NULL; ret = readdir_r(dp, &entry, &ep)) {
@@ -361,4 +389,3 @@ static int checkHelperIsRunning(void) {
 
 	return retVal;
 }
-

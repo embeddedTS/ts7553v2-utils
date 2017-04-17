@@ -1,18 +1,20 @@
-PROGNAME = cairo-test
+PROGNAME = keypad-test
 
 PWD		= $(shell pwd)
-
+ 
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
-
-
+ 
 OBJS := main.o lcd-display.o
 
-INCLUDES = -I/usr/include -I/usr/include/cairo
+INCLUDES = -I/usr/include -I/usr/include/cairo -I../spi-lcd/cairo-test
 LIBS = -lcairo
+
 CFLAGS = $(INCLUDES) -Wall -O3
 LDFLAGS = $(LIBS)
-	
+
+vpath %.c ../spi-lcd/cairo-test
+
 $(PROGNAME):  $(OBJS)	
 	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
