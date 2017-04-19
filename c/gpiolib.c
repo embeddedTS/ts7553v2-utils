@@ -90,7 +90,7 @@ int gpio_setedge(int gpio, int rising, int falling)
 int gpio_select(int gpio)
 {
 	char gpio_irq[64];
-	int ret = 0, buf, irqfd;
+	int buf, irqfd;
 	fd_set fds;
 	FD_ZERO(&fds);
 
@@ -108,7 +108,7 @@ int gpio_select(int gpio)
 
 	while(1) {
 		FD_SET(irqfd, &fds);
-		ret = select(irqfd + 1, NULL, NULL, &fds, NULL);
+		select(irqfd + 1, NULL, NULL, &fds, NULL);
 		if(FD_ISSET(irqfd, &fds))
 		{
 			FD_CLR(irqfd, &fds);  //Remove the filedes from set
@@ -117,6 +117,7 @@ int gpio_select(int gpio)
 			return 1;
 		}
 	}
+
 }
 
 int gpio_export(int gpio)
@@ -124,6 +125,15 @@ int gpio_export(int gpio)
 	int efd;
 	char buf[50];
 	int ret;
+
+        /* Quick test if it has already been exported */
+        sprintf(buf, "/sys/class/gpio/gpio%d/value", gpio);
+        efd = open(buf, O_WRONLY);
+        if(efd != -1) {
+                close(efd);
+                return 0;
+        }
+
 	efd = open("/sys/class/gpio/export", O_WRONLY);
 
 	if(efd != -1) {
@@ -215,7 +225,8 @@ static void usage(char **argv) {
 	  "  -e, --setout <dio>     Sets a sysfs DIO output value high\n"
 	  "  -l, --clrout <dio>     Sets a sysfs DIO output value low\n"
 	  "  -d, --ddrout <dio>     Set sysfs DIO to an output\n"
-	  "  -r, --ddrin <dio>      Set sysfs DIO to an input\n\n",
+	  "  -r, --ddrin <dio>      Set sysfs DIO to an input\n"
+	  "  -w, --waitfor <dio>    Wait for IO to change to configured edge\n",
 	  argv[0]
 	);
 }
@@ -229,6 +240,7 @@ int main(int argc, char **argv)
 	  { "clrout", 1, 0, 'l' },
 	  { "ddrout", 1, 0, 'd' },
 	  { "ddrin", 1, 0, 'r' },
+	  { "waitfor", 1, 0, 'w' },
 	  { "help", 0, 0, 'h' },
 	  { 0, 0, 0, 0 }
 	};
@@ -238,45 +250,47 @@ int main(int argc, char **argv)
 		return(1);
 	}
 
-	while((c = getopt_long(argc, argv, "p:e:l:d:r:", long_options, NULL)) != -1) {
-		int gpio, i;
+	while((c = getopt_long(argc, argv, "p:e:l:d:r:w:", long_options, NULL)) != -1) {
+		int gpio;
 
 		switch(c) {
 		case 'p':
 			gpio = atoi(optarg);
 			gpio_export(gpio);
 			printf("gpio%d=%d\n", gpio, gpio_read(gpio));
-			gpio_unexport(gpio);
 			break;
 		case 'e':
 			gpio = atoi(optarg);
 			gpio_export(gpio);
 			gpio_write(gpio, 1);
-			gpio_unexport(gpio);
 			break;
 		case 'l':
 			gpio = atoi(optarg);
 			gpio_export(gpio);
 			gpio_write(gpio, 0);
-			gpio_unexport(gpio);
 			break;
 		case 'd':
 			gpio = atoi(optarg);
 			gpio_export(gpio);
 			gpio_direction(gpio, 1);
-			gpio_unexport(gpio);
 			break;
 		case 'r':
 			gpio = atoi(optarg);
 			gpio_export(gpio);
 			gpio_direction(gpio, 0);
-			gpio_unexport(gpio);
+			break;
+		case 'w':
+			gpio = atoi(optarg);
+			gpio_export(gpio);
+			gpio_select(gpio);
 			break;
 		case 'h':
 		default:
 			usage(argv);
 		}
 	}
+
+	return 0;
 }
 
 #endif // CTL
