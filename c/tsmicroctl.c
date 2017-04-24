@@ -97,28 +97,28 @@ void do_info(int twifd)
 	read(twifd, data, 32);
 
 	printf("revision=0x%x\n", data[31]);
-	printf("SUPERCAP_V=%d\n", sscale((data[0]<<8|data[1])));
-	printf("SUPERCAP_TOT=%d\n", rscale((data[2]<<8|data[3]), 20, 20));
+	printf("supercap_v=%d\n", sscale((data[0]<<8|data[1])));
+	printf("supercap_tot=%d\n", rscale((data[2]<<8|data[3]), 20, 20));
 	pct = (((data[2]<<8|data[3])*100/237));
 	if (pct > 311) {
 		pct = pct - 311;
+		if (pct > 100) pct = 100;
 	} else {
 		pct = 0;
 	}
-	printf("SUPERCAP_PCT=%d\n", pct > 100 ? 100 : pct);
+	printf("supercap_pct=%d\n", pct > 100 ? 100 : pct);
 
-	printf("VCHARGE=%d\n", rscale((data[16]<<8|data[17]), 422, 422));
-	printf("V4P7=%d\n", rscale((data[4]<<8|data[5]), 20, 20));
+	printf("vcharge=%d\n", rscale((data[16]<<8|data[17]), 422, 422));
+	printf("v4p7=%d\n", rscale((data[4]<<8|data[5]), 20, 20));
 
-	printf("VIN=%d\n", rscale((data[6]<<8|data[7]), 1910, 172));
-	printf("V5_A=%d\n", rscale((data[8]<<8|data[9]), 536, 422));
-	printf("V3P3=%d\n", rscale((data[10]<<8|data[11]), 422, 422));
-	printf("RAM_V1P35=%d\n", sscale((data[12]<<8|data[13])));
-	printf("VCORE=%d\n", sscale((data[14]<<8|data[15])));
-	printf("VSOC=%d\n", sscale((data[18]<<8|data[19])));
-	printf("VARM=%d\n", sscale((data[20]<<8|data[21])));
+	printf("vin=%d\n", rscale((data[6]<<8|data[7]), 1910, 172));
+	printf("v5_a=%d\n", rscale((data[8]<<8|data[9]), 536, 422));
+	printf("v3p3=%d\n", rscale((data[10]<<8|data[11]), 422, 422));
+	printf("ram_v1p35=%d\n", sscale((data[12]<<8|data[13])));
+	printf("vcore=%d\n", sscale((data[14]<<8|data[15])));
+	printf("vsoc=%d\n", sscale((data[18]<<8|data[19])));
+	printf("varm=%d\n", sscale((data[20]<<8|data[21])));
 
-	printf("temp_sensor=0x%x\n", data[22]<<8|data[23]);
 	printf("reboot_source=");
 
 	switch(data[30] & 0x3) {
