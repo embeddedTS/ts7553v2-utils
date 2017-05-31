@@ -11,9 +11,9 @@ while true; do
     gpioctl --waitfor 128
     while eval $(gpioctl --getin 128); [ "$gpio128" -eq "1" ] ; do
         eval $(tsmicroctl -i)
-        echo "Supercaps at $SUPERCAP_PCT"
+        echo "Supercaps at $supercap_pct"
 
-        if [ $SUPERCAP_PCT -le $RESET_PCT ]; then
+        if [ $supercap_pct -le $RESET_PCT ]; then
             # Code can be added below in order to turn off power-hungry
             # devices, or start other shutdown procedures required.
             # For example:
