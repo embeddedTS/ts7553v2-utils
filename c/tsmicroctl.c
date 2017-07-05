@@ -145,8 +145,8 @@ static void usage(char **argv) {
 	  "\n"
 	  "  -i, --info              Get info about the microcontroller\n"
 	  "  -L, --sleep=<time>      Sleep CPU, <time> seconds to wake up in\n"
-	  "  -S, --supercapon        Enable charging of TS-SILO supercaps\n"
-	  "  -s, --supercapoff       Disable charging of TS-SILO supercaps\n"
+	  "  -S, --tssiloon          Enable charging of TS-SILO supercaps\n"
+	  "  -s, --tssilooff         Disable charging of TS-SILO supercaps\n"
 	  "  -h, --help              This message\n",
 	  argv[0]
 	);
@@ -163,6 +163,8 @@ int main(int argc, char **argv)
 	  { "sleep", 1, 0, 'L'},
 	  { "supercapon", 0, 0, 'S'},
 	  { "supercapoff", 0, 0, 's'},
+	  { "tssiloon", 0, 0, 'S'},
+	  { "tssilooff", 0, 0, 's'},
 	  { "help", 0, 0, 'h' },
 	  { 0, 0, 0, 0 }
 	};
