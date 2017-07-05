@@ -8,7 +8,6 @@ echo 128 > /sys/class/gpio/export 2>/dev/null
 echo rising > /sys/class/gpio/gpio128/edge
 
 while true; do
-    gpioctl --waitfor 128
     while eval $(gpioctl --getin 128); [ "$gpio128" -eq "1" ] ; do
         eval $(tsmicroctl -i)
         echo "Supercaps at $supercap_pct"
