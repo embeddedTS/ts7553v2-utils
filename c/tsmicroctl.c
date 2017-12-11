@@ -145,8 +145,8 @@ static void usage(char **argv) {
 	  "\n"
 	  "  -i, --info              Get info about the microcontroller\n"
 	  "  -L, --sleep=<time>      Sleep CPU, <time> seconds to wake up in\n"
-	  "  -S, --tssiloon          Enable charging of TS-SILO supercaps\n"
-	  "  -s, --tssilooff         Disable charging of TS-SILO supercaps\n"
+	  "  -e, --tssiloon          Enable charging of TS-SILO supercaps\n"
+	  "  -d, --tssilooff         Disable charging of TS-SILO supercaps\n"
 	  "  -h, --help              This message\n",
 	  argv[0]
 	);
@@ -190,7 +190,7 @@ int main(int argc, char **argv)
 	
 
 	while((c = getopt_long(argc, argv, 
-	  "iL:hSs",
+	  "iL:hSsed",
 	  long_options, NULL)) != -1) {
 		switch (c) {
 		  case 'i':
@@ -200,9 +200,11 @@ int main(int argc, char **argv)
 			opt_sleep = 1;
 			opt_timewkup = strtoul(optarg, NULL, 0);
 			break;
+		  case 'e':
 		  case 'S':
 			opt_supercap = 1;
 			break;
+		  case 'd':
 		  case 's':
 			opt_supercap = 2;
 			break;
