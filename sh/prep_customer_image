@@ -1,0 +1,202 @@
+#!/bin/bash
+
+# Copyright (c) 2017 - Technologic Systems
+
+# WARNING! READ BEFORE USING THIS SCRIPT!
+# 
+# This script uses a number of commands and parses their output.  The output
+# of the commands may change from distribution to distribution, or even across
+# different releases of the same distribution.  This script is provided as
+# a reference to our customers to note what files are important when creating
+# a "golden" image for a production process.  It should be used carefully, and
+# all image files produced by this script should be throughly checked before
+# being officially released.
+#
+# Technologic Systems assumes no responsibility for the end use of this script.
+
+PREP_SCRIPTS=""
+POST_SCRIPTS="" 
+
+# This file is used to test and prepare an image for release. There are board
+# specific tests that occur first, and then all of the generic test/prep
+# occurs.
+#
+# Note that this script is tailored to an end customer preparing an image.
+# Some of our standard preparations are not done as they would likely not be
+# wanted in an end application
+#
+# Run `prep_image /dev/<whole device> <imagename>`
+# Or `prep_image <imagename>.dd[.bz2,.gz]`
+# Source image is only read and not modified
+# Current user must be root, or, user must have proper permissions
+#
+# Generic tests/preperation include:
+#   If $1 is dev node, create 64kbyte aligned image that is at least
+#     one sector longer than the last sector listed in fdisk
+#   Verify .dd is 64kbyte aligned
+#   fsck last partition
+#   Mount last partition
+#   Remove /etc/ssh/*key*  # Done to ensure each device has unique key
+#   Remove /etc/machine-id # Done to ensure each device is unique
+#   Remove /var/lib/dbus/machine-id (NOTE! Most Debian distros will NOT auto
+#     re-create this file! Some of our products will detect if it is not present
+#     and then create it on first bootup.) # Done to ensure uniqueness
+#   Comment "#" /etc/udev/rules.d/75-persistent-net-generator.rules
+#   Remove /etc/udev/rules.d/70-persistent-net.rules # Prevents network issues
+#   Remove /var/log/*, only files, leave folder tree intact
+#   Remove any packages in /var/cache/apt/archives (equiv. to apt-get clean)
+#   Set /root.version-cust to current date
+#   Set up /etc/hosts from /etc/hostname, use Debian defaults otherwise
+#   Run any board specific scripts in PREP_SCRIPTS
+#   Create /md5sums.txt of all of the md5sums of files in rootfs
+#   Create tarball of filesystem
+#   Zero FS for compression
+#   Unmount FS
+#   Post image production scripts in POST_SCRIPTS
+#   Compress image as bz2, and generate md5s for .dd and .dd.bz2
+#
+
+if [ $UID != 0 -o $# -eq 0 ]; then
+  echo "prep_image, a tool to prepare TS images for shipping. Runs various tests,"
+  echo "cleans up temporary files left in images, preps images, and outputs"
+  echo "compressed .bz2 and .md5 files"
+  echo "Note that running this on an image will result in image modification,"
+  echo "however running it on a /dev/node will first create an image, and"
+  echo "then modify it from there."
+  echo "This script assumes the last partition is the linux partition"
+  echo ""
+  echo "Usage: $0 </path/to/image/or/dev/node> [image_prefix]"
+  echo "image_prefix is used as the base name when pulling an image from dev node"
+  echo "If not provided, base name of +%d%b%y is used"
+  echo "Must be root when running this script, the use of \`mount\` is required"
+  exit 1
+fi
+
+if [ ! -e $1 ]; then
+  echo "Requested file does not exist!"
+  exit 1
+fi
+
+case $1 in
+  *".dd") 
+    image_file=$1
+    ;;
+  *".dd.bz2") 
+    echo "bunzip'ing $1"
+    bunzip2 $1
+    if [ "$?" != "0" ]; then exit 1; fi
+    image_file=${1/.bz2/}
+    ;;
+  *".dd.gz")
+    echo "gunzip'ing $1"
+    gunzip $1
+    if [ "$?" != "0" ]; then exit 1; fi
+    image_file=${1/.gz/}
+    ;;
+  "/dev/"*)
+    EOD=`fdisk -l $1 | tail -n 2 | awk '$6 == 83 {print $3}'`
+    while : ; do
+      let EOD=$EOD+1
+      let EOD_byte=($EOD)*512
+      let x="$EOD_byte & 0xffff"
+      if [ "$x" -eq 0 ]; then break; fi
+    done
+
+    if [ $2 ]; then
+      image_file=${2}.dd
+    else
+      image_file="`date +%d%b%y`.dd"
+    fi
+
+    if [ -e $image_file ] ; then
+      echo "File already exists \"$image_file\" will not overwrite"
+      exit 1
+    fi
+
+    echo "Creating image file \"$image_file\" that is $EOD_byte bytes long from $1"
+    dd if=$1 of=$image_file bs=512 count=$EOD 
+    if [ "$?" != 0 ]; then exit 1; fi
+    echo "Image file created from disk."
+    ;;
+  *)
+    echo "File must be a .dd, .dd.bz2, .dd.gz, or /dev/*"
+    exit 1;;
+esac
+
+eval `stat -L -c "imgsize=%s" $image_file`
+let x="imgsize & 0xffff"
+if [ "$x" -ne 0 ]; then
+  echo "Error: Image is not aligned to 64kbyte"
+  exit 1
+fi
+
+
+linux_start=`fdisk -l $image_file | tail -n 2 | awk '$6 == 83 {print $2}'`
+let linux_start=$linux_start*512
+mkdir mount_point
+
+echo "Performing fsck on last (linux) partition of disk image"
+losetup /dev/loop0 -o$linux_start $image_file
+if [ "$?" != "0" ]; then exit 1; fi
+fsck /dev/loop0 -y
+
+echo "Mounting last (linux) partition of disk image"
+mount /dev/loop0 mount_point/ 
+if [ "$?" != "0" ]; then exit 1; fi
+
+echo "Removing temporary files, SSL keys, apt-get install files, etc."
+rm -rfv mount_point/etc/ssh/*key*
+rm -rfv mount_point/etc/machine-id
+rm -rfv mount_point/var/lib/dbus/machine-id
+rm mount_point/etc/udev/rules.d/70-persistent-net.rules
+echo "#" > mount_point/etc/udev/rules.d/75-persistent-net-generator.rules
+
+echo "Removing log files (rm will error if no logs present)"
+find mount_point/var/log/ -type f -print0 | xargs -0 rm -v
+
+echo "Cleaning up apt packages and temp files (apt-get clean)"
+rm -rfv mount_point/var/cache/apt/archives/* mount_point/var/cache/apt/pkgcache.bin mount_point/var/cache/apt/srcpkgcache.bin
+
+vers=`date +%Y-%m-%d`
+echo "Setting /root.version-cust to $vers"
+echo $vers > mount_point/root.version-cust
+
+echo "Setting up proper /etc/hosts file from hostname"
+echo "127.0.0.1	localhost" > mount_point/etc/hosts
+echo -n "127.0.0.1	" >> mount_point/etc/hosts
+cat mount_point/etc/hostname >> mount_point/etc/hosts
+echo "::1		localhost ip6-localhost ip6-loopback" >> mount_point/etc/hosts
+echo "ff02::1		ip6-allnodes" >> mount_point/etc/hosts
+echo "ff02::2		ip6-allrouters"  >> mount_point/etc/hosts
+
+echo "Calling Prep scripts"
+for I in $PREP_SCRIPTS; do ./$I $image_file; done
+
+echo "Creating md5sums.txt md5sums"
+cd mount_point/
+find . -type f \( ! -name md5sums.txt \) -exec md5sum "{}" + > md5sums.txt
+cd ../
+
+echo "Creating compressed tarball"
+tar cf  ${image_file%.dd}.tar -C mount_point/ .
+bzip2 ${image_file%.dd}.tar
+md5sum ${image_file%.dd}.tar.bz2 > ${image_file%.dd}.tar.bz2.md5
+
+echo "Zeroing out free space in FS for better compression"
+dd if=/dev/zero of=mount_point/zerofile
+rm mount_point/zerofile
+
+umount mount_point
+if [ "$?" != "0" ]; then exit 1; fi
+losetup -d /dev/loop0
+if [ "$?" != "0" ]; then exit 1; fi
+echo "Image file unmounted"
+
+echo "Calling post scripts"
+for I in $POST_SCRIPTS; do ./$I $image_file; done
+
+echo "Compressing and generating md5s"
+md5sum $image_file > $image_file.md5
+bzip2 -9 $image_file
+md5sum $image_file.bz2 > $image_file.bz2.md5
+
