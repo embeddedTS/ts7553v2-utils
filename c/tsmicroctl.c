@@ -16,7 +16,7 @@
 *  WITHOUT THE PRIOR WRITTEN CONSENT OF TECHNOLOGIC SYSTEMS  COULD
 *  SUBJECT THE PERPETRATOR TO CRIMINAL AND CIVIL LIABILITY.
 */
-/* To compile tshwctl, use the appropriate cross compiler and run the
+/* To compile tsmicroctl, use the appropriate cross compiler and run the
 * command:
 *
 *  arm-linux-gnueabihf-gcc -fno-tree-cselim -Wall -O0 -DCTL -o tsmicroctl tsmicroctl.c
