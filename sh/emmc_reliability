@@ -1,0 +1,201 @@
+#!/bin/bash
+
+# This script sets up the enhanced area and write_reliability modes of an eMMC
+# device.  These processes are one-way, and can be dangerous if not done with
+# care.  Setting these modes will also affect the boot partitions, which is
+# problematic on devices that use eMMC as the boot media.
+#
+# This script assumes that $1 is the proper device node, but does ensure that
+# it is a valid eMMC device.
+
+# This script essentially does the following:
+#
+#   Ensure specified device is an eMMC device
+#   Read the boot partitions of the eMMC device to a file
+#   Get the max enhanced area size
+#   Set write_reliability
+#   Set enh_area
+#   Power cycle the eMMC
+#   Verify write_reliability and enh_area settings
+#   Set boot and partition options
+#   Power cycle to set partition options
+#   Verify boot and partition options
+#   Set boot partitions as read/write
+#   Write boot partition back to disk
+#
+# Exit codes:
+#   0 == Success
+#   1 == Specified device is not an eMMC device
+#   2 == Write reliability and enhanced area settings did not get set
+#   3 == Partition and boot bus settings were read as incorrect
+#   4 == Boot partitions read back do not match original read
+
+error=0
+
+echo -e "\nTesting for eMMC device"
+mmc extcsd read "$1" >/dev/null 2>&1
+if [ $? -ne 0 ] 
+then
+  echo "Specified device '$1' is not an eMMC device!"
+  exit 1
+fi
+
+# Get md5sum of boot partitions
+echo -e "\nGetting md5sums of boot partitions"
+boot0md5=$(dd if="${1}boot0" >/dev/null 2>&1 | md5sum -)
+boot1md5=$(dd if="${1}boot1" >/dev/null 2>&1 | md5sum -)
+
+# Save the boot partitions
+echo -e "\nSaving the boot partitions"
+dd if="${1}boot0" of=boot0 bs=512 >/dev/null 2>&1
+dd if="${1}boot1" of=boot1 bs=512 >/dev/null 2>&1
+
+# Get max enhanced size from disk
+enh_size=$(mmc extcsd read "$1" | grep MAX_ENH_SIZE_MULT|cut -d":" -f2)
+let "enh_size=$enh_size*4096"
+echo -e "\nEnhanced size is $enh_size KiB"
+
+# Set write_reliability
+echo -e "\nSetting write_reliability mode"
+mmc write_reliability set -c 0 "$1" >/dev/null 2>&1
+
+# Set whole disk to enhanced size
+echo -e "\nSetting enh_area to whole disk"
+mmc enh_area set -y 0 "$enh_size" "$1" >/dev/null 2>&1
+sleep 5
+
+# Power cycle
+# The disk is polled, so wait for it to disappear then arbitrary timeout.
+# Wait for it to appear and then arbitrary timeout before continuing.
+echo -e "\nPower cycling the eMMC device"
+echo 0 > /sys/class/leds/en-emmc/brightness
+while [ -e "$1" ]; do false; done
+sleep 2
+echo 1 > /sys/class/leds/en-emmc/brightness
+while [ ! -e "$1" ]; do false; done
+sleep 2
+
+# Check setting complete after power cycle
+complete=$(mmc extcsd read "$1" | grep PARTITION_SETTING_COMPLETED|cut -d":" -f2)
+let "complete=$complete*1"
+if [ "$complete" -ne 1 ]
+then
+  echo -e "\nErr! Partition changes appear to have not been completed!"
+  error=1
+else
+  echo -e "\nPartition changes completed!"
+fi
+
+# Verify enh_area
+enh_done=$(mmc extcsd read "$1" | grep ENH_SIZE_MULT | grep -v MAX |cut -d":" -f2)
+let "enh_done=$enh_done*4096"
+if [ "$enh_size" -ne "$enh_done" ]
+then
+  echo -e "\nErr! Actual enhanced size \($enh_done KiB\) does not match max!\n"
+  error=1
+else
+  echo -e "\nActual enhanced size is $enh_done KiB"
+fi
+
+# Verify write_reliability 
+rel_done=$(mmc extcsd read "$1" | grep WR_REL_SET | grep -v EXT_CSD | cut -d":" -f2)
+let "rel_done=$rel_done*1"
+if [ "$rel_done" -ne 1 ]
+then
+  echo -e "\nErr! Write reliability was not properly set!"
+  error=1
+else
+  echo -e "\nWrite reliability successfully set!"
+fi
+
+if [ $error -eq 1 ]
+then
+  echo -e "\nPrevious errors have occurred! Refusing to continue!"
+  exit 2
+fi
+
+# Set boot and partition options
+echo -e "\nSetting boot and partition options"
+mmc bootbus set dual x1 x4 "$1" >/dev/null 2>&1
+mmc bootpart enable 1 1 "$1" >/dev/null 2>&1
+
+# Power cycle again
+echo -e "\nPower cycling the eMMC device again"
+echo 0 > /sys/class/leds/en-emmc/brightness
+while [ -e "$1" ]; do false; done
+sleep 2
+echo 1 > /sys/class/leds/en-emmc/brightness
+while [ ! -e "$1" ]; do false; done
+sleep 2
+
+# Verify partition options
+part_done=$(mmc extcsd read "$1" | grep PARTITION_CONFIG|cut -d":" -f2| tr -d ])
+let "part_done=$part_done*1"
+if [ "$part_done" -ne 72 ]
+then
+  echo -e "\nErr! Partition configuration was not properly set!"
+  error=1
+else
+  echo -e "\nPartition configuration completed!"
+fi
+
+# Verify boot bus conditions
+boot_done=$(mmc extcsd read "$1" | grep BOOT_BUS_CONDITIONS|cut -d":" -f2| tr -d ])
+let "boot_done=$boot_done*1"
+if [ "$boot_done" -ne 17 ]
+then
+  echo -e "\nErr! Boot configuration was not properly set!"
+  error=1
+else
+  echo -e "\nBoot configuration completed!"
+fi
+
+if [ $error -eq 1 ]
+then
+  echo -e "\nPrevious errors have occurred! Refusing to continue!"
+  exit 3
+fi
+
+# Set boot partitions as read/write
+echo -e "\nSetting boot partitions to read/write"
+echo 0 > /sys/block/"$(basename "$1")boot0"/force_ro
+echo 0 > /sys/block/"$(basename "$1")boot1"/force_ro
+
+# Write back boot partitions to disk
+echo -e "\nWriting boot data back to disk"
+dd if=boot0 of="${1}boot0" bs=512 >/dev/null 2>&1
+dd if=boot1 of="${1}boot1" bs=512 >/dev/null 2>&1
+sync
+
+# Set boot partitions as readonly
+echo -e "\nSetting boot partitions to readonly"
+echo 1 > /sys/block/"$(basename "$1")boot0"/force_ro
+echo 1 > /sys/block/"$(basename "$1")boot1"/force_ro
+
+# Check md5sum of boot partitions
+echo -e "\nChecking md5sums of boot partitions"
+boot0md5_done=$(dd if="${1}boot0" >/dev/null 2>&1 | md5sum -)
+boot1md5_done=$(dd if="${1}boot1" >/dev/null 2>&1 | md5sum -)
+if [ "$boot0md5" != "$boot0md5_done" ]
+then
+  echo -e "\nErr! Data read back from boot0 does not match original MD5!"
+  error=1
+else
+  echo -e "\nData from boot0 matches original MD5!"
+  rm boot0
+fi
+if [ "$boot1md5" != "$boot1md5_done" ]
+then
+  echo -e "\nErr! Data read back from boot1 does not match original MD5!"
+  error=1
+else
+  echo -e "\nData from boot1 matches original MD5!"
+  rm boot1
+fi
+
+if [ $error -eq 1 ]
+then
+  echo -e "\nPrevious errors have occurred! Refusing to continue!"
+  exit 4
+fi
+
