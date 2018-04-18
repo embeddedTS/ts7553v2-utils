@@ -10,6 +10,8 @@ AC_CONFIG_SRCDIR([src/i2c-dev.h])
 AC_PROG_CC
 
 # Checks for libraries.
+AC_SEARCH_LIBS([cairo_create], [cairo], [],
+		[AC_MSG_FAILURE([libcairo not found])])
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h sys/ioctl.h unistd.h])
