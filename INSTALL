@@ -1,0 +1,6 @@
+To compile and install, run the following steps
+
+  $ autoreconf -vis .
+  $ ./configure  #Specify cross-compiler if used
+  $ make
+  $ make install
