@@ -99,7 +99,7 @@ static void usage(char **argv) {
 int main(int argc, char **argv)
 {
 	int c;
-	int ret;
+	int ret = 1;
 
 	static struct option long_options[] = {
 	  { "info", 0, 0, 'i' },
