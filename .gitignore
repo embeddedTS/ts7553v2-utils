@@ -1,3 +1,11 @@
+config.log
+config.status
+*.o
+Makefile
+**/Makefile
+**/.deps
+**/.dirstamp
+
 # http://www.gnu.org/software/automake
 
 Makefile.in
