@@ -124,19 +124,26 @@ static void displayUpdateFunction(void) {
    unsigned long spi_speed;
    struct spi_ioc_transfer xfer[2];
    int status;
+   static unsigned char nop_cmd[1] = {0xe3};
 
    signal(SIGHUP, sighup_handler); // send me a SIGHUP and I'll exit!
 
    lcd_reset(LCD_RESETN_ACTIVE);
    usleep(50000);
-   lcd_reset(LCD_RESETN_INACTIVE);
-   usleep(50000);
-   lcd_backlight(BACKLIGHT_ON);
 
-   memset((void*)frameBuffer, 0, bufferSize);
-
-   *previousFrameBuffer = 1;  // to force initial lcd update
-
+	/* According to kernel 4.7.y commit 793c7f9212, it is the responsibility
+	 * of the SPI device driver (not the SPI peripheral driver) to send an
+	 * empty dummy transfer to prevent unwanted clock edges on first use.
+	 * For some reason, the eCSPI peripheral driver seems to be ok with
+	 * setting the mode after CS has been asserted. Looks like this is due
+	 * to efforts for power saving. That is, when the SPI peripheral is not
+	 * in active use, then there are no clocks to the SPI peripheral so
+	 * there is no way to modify modes until a transaction starts which
+	 * then asserts CS.
+	 *
+	 * Do a NOP command via SPI when the LCD is still held in reset to burn
+	 * one byte and set the proper clock mode in moving forward.
+	 */
 	lcd_data_cmd_select(CMD_LUN);
    spi_mode = SPI_CPHA | SPI_CPOL;
    ioctl(spi_fd, SPI_IOC_WR_MODE, &spi_mode);
@@ -145,6 +152,30 @@ static void displayUpdateFunction(void) {
    ioctl(spi_fd, SPI_IOC_RD_BITS_PER_WORD, &spi_bits);
    spi_speed = 5000000;
    ioctl(spi_fd, SPI_IOC_WR_MAX_SPEED_HZ, &spi_speed);
+
+   memset(xfer, 0, sizeof(xfer));
+   xfer[0].delay_usecs = 100;
+   xfer[0].speed_hz = spi_speed;
+   xfer[0].bits_per_word = spi_bits;
+   xfer[0].tx_buf = (unsigned long)nop_cmd;
+   xfer[0].len = sizeof(nop_cmd);
+   xfer[1].rx_buf = 0;
+	xfer[1].len = 0;
+
+   if ((status = ioctl(spi_fd, SPI_IOC_MESSAGE(2), xfer)) < 0) {
+      fprintf(stderr, "Error sending init string to LCD\n");
+      return;
+   }
+
+   /* Now unreset LCD and send init string */
+   lcd_reset(LCD_RESETN_INACTIVE);
+   usleep(50000);
+   lcd_backlight(BACKLIGHT_ON);
+
+   memset((void*)frameBuffer, 0, bufferSize);
+
+   *previousFrameBuffer = 1;  // to force initial lcd update
+
 
    memset(xfer, 0, sizeof(xfer));
    xfer[0].delay_usecs = 100;
@@ -276,9 +307,6 @@ int main(void) {
       return 1;
    }
 
-   fd = open("/dev/mem", O_RDWR|O_SYNC);
-
-   
    if((dir = opendir("/sys/class/graphics")) == NULL) {
       fprintf(stderr, "ERROR: Cannot access /sys/class/graphics\n");
       return 1;
