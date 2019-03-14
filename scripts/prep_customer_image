@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2017 - Technologic Systems
+# Copyright (c) 2017-2019 - Technologic Systems
 
 # WARNING! READ BEFORE USING THIS SCRIPT!
 # 
@@ -37,12 +37,9 @@ POST_SCRIPTS=""
 #   fsck last partition
 #   Mount last partition
 #   Remove /etc/ssh/*key*  # Done to ensure each device has unique key
-#   Remove /etc/machine-id # Done to ensure each device is unique
-#   Remove /var/lib/dbus/machine-id (NOTE! Most Debian distros will NOT auto
-#     re-create this file! Some of our products will detect if it is not present
-#     and then create it on first bootup.) # Done to ensure uniqueness
-#   Comment "#" /etc/udev/rules.d/75-persistent-net-generator.rules
-#   Remove /etc/udev/rules.d/70-persistent-net.rules # Prevents network issues
+#   Touch the file /firstboot. This is used in Debian Stretch to recreate keys
+#   Remove /etc/machine-id and touch to force systemd to recreate it
+#   Remove /var/lib/dbus/machine-id
 #   Remove /var/log/*, only files, leave folder tree intact
 #   Remove any packages in /var/cache/apt/archives (equiv. to apt-get clean)
 #   Set /root.version-cust to current date
@@ -146,10 +143,10 @@ if [ "$?" != "0" ]; then exit 1; fi
 
 echo "Removing temporary files, SSL keys, apt-get install files, etc."
 rm -rfv mount_point/etc/ssh/*key*
+touch mount_point/firstboot
 rm -rfv mount_point/etc/machine-id
 rm -rfv mount_point/var/lib/dbus/machine-id
-rm mount_point/etc/udev/rules.d/70-persistent-net.rules
-echo "#" > mount_point/etc/udev/rules.d/75-persistent-net-generator.rules
+touch mount_point/etc/machine-id
 
 echo "Removing log files (rm will error if no logs present)"
 find mount_point/var/log/ -type f -print0 | xargs -0 rm -v
