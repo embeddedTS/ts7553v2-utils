@@ -90,7 +90,7 @@ static void usage(char **argv) {
 	fprintf(stderr, "Usage: %s [OPTION] ...\n"
 	  "Technologic Systems Hardware access\n"
 	  "\n"
-	  "  -i, --info              Get info about the microcontroller\n"
+	  "  -i, --info              Get info about the SBC\n"
 	  "  -h, --help              This message\n",
 	  argv[0]
 	);
