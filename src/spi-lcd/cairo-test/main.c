@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
+
 #include <stdio.h>
 #include <cairo/cairo.h>
 #include <math.h>

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# SPDX-License-Identifier: BSD-2-Clause
 # Copyright (c) 2017-2019 - Technologic Systems
 
 # WARNING! THIS FILE IS NOT WHAT AN END CUSTOMER SHOULD BE USING! THIS SCRIPT
