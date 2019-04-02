@@ -43,6 +43,11 @@ POST_SCRIPTS=""
 #   Remove /var/lib/dbus/machine-id
 #   Remove /var/log/*, only files, leave folder tree intact
 #   Remove any packages in /var/cache/apt/archives (equiv. to apt-get clean)
+#   Remove /var/backups/*
+#   Remove temporary/unique files
+#     /.readahead
+#     /run/utmp
+#     /var/lib/systemd/random-seed
 #   Set /root.version-cust to current date
 #   Set up /etc/hosts from /etc/hostname, use Debian defaults otherwise
 #   Run any board specific scripts in PREP_SCRIPTS
@@ -154,6 +159,12 @@ find mount_point/var/log/ -type f -print0 | xargs -0 rm -v
 
 echo "Cleaning up apt packages and temp files (apt-get clean)"
 rm -rfv mount_point/var/cache/apt/archives/* mount_point/var/cache/apt/pkgcache.bin mount_point/var/cache/apt/srcpkgcache.bin
+
+echo "Removing /var/backups/*"
+rm -rfv mount_point/var/backups/*
+
+echo "Removing temporary/unique files"
+rm mount_point/.readahead mount_point/run/utmp mount_point/var/lib/systemd/random-seed
 
 vers=`date +%Y-%m-%d`
 echo "Setting /root.version-cust to $vers"
