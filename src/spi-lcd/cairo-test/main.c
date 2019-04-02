@@ -7,6 +7,9 @@
 
 #include "lcd-display.h"
 
+const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+  GITCOMMIT;
+
 static lcdInfo_t *lcd;
 
 int main(void) {

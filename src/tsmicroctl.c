@@ -16,7 +16,8 @@
 
 #include "i2c-dev.h"
 
-const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ ;
+const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+  GITCOMMIT;
 
 #ifdef CTL
 int model = 0;
@@ -117,15 +118,18 @@ void do_info(int twifd)
 }
 
 static void usage(char **argv) {
-	fprintf(stderr, "Usage: %s [OPTION] ...\n"
+	fprintf(stderr,
+	  "%s\n\n"
+	  "Usage: %s [OPTION] ...\n"
 	  "Technologic Systems Microcontroller Access\n"
 	  "\n"
 	  "  -i, --info              Get info about the microcontroller\n"
 	  "  -L, --sleep=<time>      Sleep CPU, <time> seconds to wake up in\n"
 	  "  -e, --tssiloon          Enable charging of TS-SILO supercaps\n"
 	  "  -d, --tssilooff         Disable charging of TS-SILO supercaps\n"
-	  "  -h, --help              This message\n",
-	  argv[0]
+	  "  -h, --help              This message\n"
+	  "\n",
+	  copyright, argv[0]
 	);
 }
 

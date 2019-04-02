@@ -18,6 +18,9 @@
 #define MAX(x,y)  ((x)>(y)?x:y)
 #endif
 
+const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+  GITCOMMIT;
+
 int running;
 static void sigint_handler(int signum) {
    running=0;  

@@ -14,6 +14,9 @@
 
 #define INPUT_DEVICE "/dev/input/event1"
 
+const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+  GITCOMMIT;
+
 static lcdInfo_t *lcd;
 static int keypad;
 static int get_input_event(void);

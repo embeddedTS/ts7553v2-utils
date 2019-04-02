@@ -23,6 +23,9 @@
 
 #define SPI_DEVNAME   "/dev/spidev2.0"
 
+const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+  GITCOMMIT;
+
 typedef enum {
    BACKLIGHT_OFF=0,
    BACKLIGHT_ON

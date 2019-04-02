@@ -3,8 +3,9 @@
 
 AC_PREREQ([2.69])
 AC_INIT(ts7553-v2-utils, 1.0, support@embeddedarm.com)
-AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/i2c-dev.h])
+
+AM_INIT_AUTOMAKE([1.00 foreign no-define])
 
 # Checks for programs.
 AC_PROG_CC
