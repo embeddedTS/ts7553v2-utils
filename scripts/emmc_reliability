@@ -51,8 +51,7 @@ dd if="${1}boot0" of=boot0 bs=512 >/dev/null 2>&1
 dd if="${1}boot1" of=boot1 bs=512 >/dev/null 2>&1
 
 # Get max enhanced size from disk
-enh_size=$(mmc extcsd read "$1" | grep MAX_ENH_SIZE_MULT|cut -d":" -f2)
-let "enh_size=$enh_size*4096"
+enh_size=$(mmc extcsd read "$1" | grep "\\[MAX_ENH_SIZE_MULT\\]" -A 1 | sed -n '2p' | cut -f 3 -d ' ')
 echo -e "\nEnhanced size is $enh_size KiB"
 
 # Set write_reliability
