@@ -143,12 +143,13 @@ let linux_start=$linux_start*512
 mkdir mount_point
 
 echo "Performing fsck on last (linux) partition of disk image"
-losetup /dev/loop0 -o$linux_start $image_file
+# Find the first available loop device
+LODEV=$(losetup --find --show -o$linux_start $image_file)
 if [ "$?" != "0" ]; then exit 1; fi
-fsck /dev/loop0 -y
+fsck "${LODEV}" -y
 
 echo "Mounting last (linux) partition of disk image"
-mount /dev/loop0 mount_point/ 
+mount "${LODEV}" mount_point/
 if [ "$?" != "0" ]; then exit 1; fi
 
 echo "Removing temporary files, SSL keys, apt-get install files, etc."
@@ -224,7 +225,7 @@ rm mount_point/zerofile
 
 umount mount_point
 if [ "$?" != "0" ]; then exit 1; fi
-losetup -d /dev/loop0
+losetup -d "${LODEV}"
 if [ "$?" != "0" ]; then exit 1; fi
 echo "Image file unmounted"
 
