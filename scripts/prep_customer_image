@@ -140,8 +140,7 @@ mkdir mount_point
 
 echo "Performing fsck on last (linux) partition of disk image"
 # Find the first available loop device
-LODEV=$(losetup --find)
-losetup "${LODEV}" -o$linux_start $image_file
+LODEV=$(losetup --find --show -o$linux_start $image_file)
 if [ "$?" != "0" ]; then exit 1; fi
 fsck "${LODEV}" -y
 
