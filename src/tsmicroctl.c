@@ -56,12 +56,12 @@ int silabs_init()
 #ifdef CTL
 
 // Scale voltage to silabs 0-2.5V
-uint16_t inline sscale(uint16_t data){
+static uint16_t inline sscale(uint16_t data){
 	return data * (2.5/1023) * 1000;
 }
 
 // Scale voltage for resistor dividers
-uint16_t inline rscale(uint16_t data, uint16_t r1, uint16_t r2)
+static uint16_t inline rscale(uint16_t data, uint16_t r1, uint16_t r2)
 {
 	uint16_t ret = (data * (r1 + r2)/r2);
 	return sscale(ret);
