@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT(ts7553-v2-utils, 1.0, support@embeddedarm.com)
+AC_INIT(ts7553-v2-utils, 1.0, support@embeddedTS.com)
 AC_CONFIG_SRCDIR([src/i2c-dev.h])
 
 AM_INIT_AUTOMAKE([1.00 foreign no-define])

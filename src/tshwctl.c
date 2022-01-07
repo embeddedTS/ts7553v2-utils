@@ -17,7 +17,7 @@
 #define STRAP2 91
 #define STRAP3 92
 
-const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+const char copyright[] = "Copyright (c) embeddedTS - " __DATE__ " - "
   GITCOMMIT;
 
 int model = 0;
@@ -68,7 +68,7 @@ static void usage(char **argv) {
 	fprintf(stderr,
 	  "%s\n\n"
 	  "Usage: %s [OPTION] ...\n"
-	  "Technologic Systems Hardware access\n"
+	  "embeddedTS Hardware access\n"
 	  "\n"
 	  "  -i, --info              Get info about the SBC\n"
 	  "  -h, --help              This message\n"

@@ -18,7 +18,7 @@
 #define MAX(x,y)  ((x)>(y)?x:y)
 #endif
 
-const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+const char copyright[] = "Copyright (c) embeddedTS - " __DATE__ " - "
   GITCOMMIT;
 
 int running;

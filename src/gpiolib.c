@@ -14,7 +14,7 @@
 #include "gpiolib.h"
 
 #ifdef CTL
-const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+const char copyright[] = "Copyright (c) embeddedTS - " __DATE__ " - "
   GITCOMMIT;
 #endif
 

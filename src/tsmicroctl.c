@@ -16,7 +16,7 @@
 
 #include "i2c-dev.h"
 
-const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+const char copyright[] = "Copyright (c) embeddedTS - " __DATE__ " - "
   GITCOMMIT;
 
 #ifdef CTL
@@ -121,7 +121,7 @@ static void usage(char **argv) {
 	fprintf(stderr,
 	  "%s\n\n"
 	  "Usage: %s [OPTION] ...\n"
-	  "Technologic Systems Microcontroller Access\n"
+	  "embeddedTS Microcontroller Access\n"
 	  "\n"
 	  "  -i, --info              Get info about the microcontroller\n"
 	  "  -L, --sleep=<time>      Sleep CPU, <time> seconds to wake up in\n"

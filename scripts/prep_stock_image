@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # SPDX-License-Identifier: BSD-2-Clause
-# Copyright (c) 2017-2019 - Technologic Systems
+# Copyright (c) 2017-2022 Technologic Systems, Inc. dba embeddedTS
 
 # WARNING! THIS FILE IS NOT WHAT AN END CUSTOMER SHOULD BE USING! THIS SCRIPT
-# IS USED BY US AT TECHNOLOGIC SYSTEMS TO PREP A STOCK IMAGE THAT WE RELEASE.
+# IS USED BY US AT embeddedTS TO PREP A STOCK IMAGE THAT WE RELEASE.
 # THIS SCRIPT REMOVES MANY FILES THAT A CUSTOMER MAY NOT WANT REMOVED, INCLUDING
 # REMOVING A ROOT PASSWORD.  PLEASE SEE THE FILE "prep_customer_image" IN THE 
 # SAME FOLDER FOR A MODIFIED VERSION OF THIS SCRIPT THAT IS MORE SUITABLE FOR
 # END CUSTOMER USE TO PREPARE AN IMAGE!
 
-# Technologic Systems assumes no responsibility for the end use of this script.
+# embeddedTS assumes no responsibility for the end use of this script.
 
 
 PREP_SCRIPTS=""

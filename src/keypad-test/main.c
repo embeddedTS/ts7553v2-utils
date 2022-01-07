@@ -14,7 +14,7 @@
 
 #define INPUT_DEVICE "/dev/input/event1"
 
-const char copyright[] = "Copyright (c) Technologic Systems - " __DATE__ " - "
+const char copyright[] = "Copyright (c) embeddedTS - " __DATE__ " - "
   GITCOMMIT;
 
 static lcdInfo_t *lcd;
