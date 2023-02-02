@@ -86,8 +86,7 @@ else
 fi
 
 # Verify enh_area
-enh_done=$(mmc extcsd read "$1" | grep ENH_SIZE_MULT | grep -v MAX |cut -d":" -f2)
-let "enh_done=$enh_done*4096"
+enh_done=$(mmc extcsd read "$1" | grep "\\[MAX_ENH_SIZE_MULT\\]" -A 1 | sed -n '2p' | cut -f 3 -d ' ')
 if [ "$enh_size" -ne "$enh_done" ]
 then
   echo -e "\nErr! Actual enhanced size \($enh_done KiB\) does not match max!\n"
