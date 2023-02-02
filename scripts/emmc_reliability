@@ -95,17 +95,6 @@ else
   echo -e "\nActual enhanced size is $enh_done KiB"
 fi
 
-# Verify write_reliability 
-rel_done=$(mmc extcsd read "$1" | grep WR_REL_SET | grep -v EXT_CSD | cut -d":" -f2)
-let "rel_done=$rel_done*1"
-if [ "$rel_done" -ne 1 ]
-then
-  echo -e "\nErr! Write reliability was not properly set!"
-  error=1
-else
-  echo -e "\nWrite reliability successfully set!"
-fi
-
 if [ $error -eq 1 ]
 then
   echo -e "\nPrevious errors have occurred! Refusing to continue!"
