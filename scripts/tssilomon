@@ -1,37 +1,39 @@
-#!/bin/bash
+#!/bin/sh
 
 # Conservative value to wait for until shutting down
 RESET_PCT=90
 
-# Set up the power_fail input pin to use sysfs gpio interrupt
-echo 128 > /sys/class/gpio/export 2>/dev/null
-echo rising > /sys/class/gpio/gpio128/edge
+# Set up the power_fail input pin to use gpiomon
+powerfail_gpio="gpiochip4 0"
+supercap_pct=0
 
 while true; do
-    while eval $(gpioctl --getin 128); [ "$gpio128" -eq "1" ] ; do
-        eval $(tsmicroctl -i)
-        echo "Supercaps at $supercap_pct"
+    # shellcheck disable=SC2086
+    POWER_FAIL=$(gpioget ${powerfail_gpio})
+    if [ "${POWER_FAIL}" -eq 1 ]; then
+        eval "$(tsmicroctl -i)"
+        echo "Supercaps at ${supercap_pct}"
 
-        if [ $supercap_pct -le $RESET_PCT ]; then
+        if [ "${supercap_pct}" -le ${RESET_PCT} ]; then
             # Code can be added below in order to turn off power-hungry
             # devices, or start other shutdown procedures required.
             # For example:
             # Turn off cell modem:
-            #   echo 0 > /sys/class/leds/en-modem-5v/brightness
+            #   gpioset 0 8=0
             #
             # Disable relay:
-            #   echo 136 > /sys/class/gpio/export 2>/dev/null
-            #   echo low > /sys/class/gpio/gpio136/direction
+            #   gpioset 4 8=0
             #
             # The wall command can be removed if wanted.
 
-            wall The script /usr/local/bin/tssilomon has detected main power has been lost!  Shutting down safely to prevent filesystem damage
+            wall "The script ${0} has detected main power has been lost! Shutting down safely to prevent filesystem damage"
 
             reboot
             exit
-        else
-            sleep .5
         fi
-    done
-    sleep .5
+        sleep 0.5
+    else
+        # shellcheck disable=SC2086
+        gpiomon --num-events=1 --rising-edge ${powerfail_gpio} >/dev/null 2>&1
+    fi
 done
