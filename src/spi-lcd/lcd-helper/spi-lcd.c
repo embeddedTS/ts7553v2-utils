@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <gpiod.h>
 #include <unistd.h>
 #include <string.h>
 #include <linux/types.h>
@@ -56,7 +57,11 @@ static void sighup_handler(int signum) {
 #define LCD_HEIGHT   64
 
 static int checkHelperIsRunning(void);
-static int spi_fd, lcdReset_fd, lcdCmd_fd, lcdBacklight_fd;
+static int spi_fd;
+static struct gpiod_chip *chip3 = NULL;
+static struct gpiod_line *lcd_rst = NULL;
+static struct gpiod_line *lcd_cmd = NULL;
+static struct gpiod_line *lcd_bklight = NULL;
 static unsigned char data[8][LCD_WIDTH];
 
 static unsigned int xRes, yRes, bitsPerPixel, stride;
@@ -96,27 +101,27 @@ static inline void clearPixel(unsigned int x, unsigned int y) {
 static void lcd_backlight(backlight_t state)
 {   
    if (state == BACKLIGHT_ON)
-      write(lcdBacklight_fd, "1\n", 2);
+      gpiod_line_set_value(lcd_bklight, 1);
    else
-      write(lcdBacklight_fd, "0\n", 2);
+      gpiod_line_set_value(lcd_bklight, 0);
 }      
 
 
 static void lcd_reset(lcd_reset_t state)
 {
    if (state == LCD_RESETN_ACTIVE)
-      write(lcdReset_fd, "0\n", 2);
+      gpiod_line_set_value(lcd_rst, 0);
    else
-      write(lcdReset_fd, "1\n", 2);     
+      gpiod_line_set_value(lcd_rst, 1);
 }
 
 
 static void lcd_data_cmd_select(cmdData_t state)
 {
    if (state == DATA_LUN) 
-      write(lcdCmd_fd, "1\n", 2);
+      gpiod_line_set_value(lcd_cmd, 1);
    else
-      write(lcdCmd_fd, "0\n", 2);      
+      gpiod_line_set_value(lcd_cmd, 0);
 }
 
 static void displayUpdateFunction(void) {
@@ -256,7 +261,7 @@ static void displayUpdateFunction(void) {
 
 int main(void) {
    char name[16];
-   int fb_fd, fd;
+   int fb_fd;
    DIR *dir;
    struct dirent *ent;
    struct fb_var_screeninfo screen_info;
@@ -267,49 +272,27 @@ int main(void) {
       return 1;
    }
 
-   if ((fd = open("/sys/class/gpio/export",  O_WRONLY|O_SYNC)) < 0) {
-      fprintf(stderr, "Can't open /sys/class/gpio/export\n");
-      return 1;
-   }
-   write(fd, "107\n", 4);
-   write(fd, "112\n", 4);
-   write(fd, "121\n", 4);
-   close(fd);
-
-   if ((fd = open("/sys/class/gpio/gpio107/direction",  O_RDWR|O_SYNC)) < 0) {
-      fprintf(stderr, "Can't open /sys/class/gpio/gpio107/direction\n");
-      return 1;
-   }
-   write(fd, "out\n", 4);
-   close(fd);
-
-   if ((fd = open("/sys/class/gpio/gpio112/direction",  O_RDWR|O_SYNC)) < 0) {
-      fprintf(stderr, "Can't open /sys/class/gpio/gpio112/direction\n");
-      return 1;
-   }
-   write(fd, "out\n", 4);
-   close(fd);
-
-   if ((fd = open("/sys/class/gpio/gpio121/direction",  O_RDWR|O_SYNC)) < 0) {
-      fprintf(stderr, "Can't open /sys/class/gpio/gpio121/direction\n");
-      return 1;
-   }
-   write(fd, "out\n", 4);
-   close(fd);
-
-   if ((lcdReset_fd = open("/sys/class/gpio/gpio107/value",  O_RDWR|O_SYNC)) < 0) {
-   fprintf(stderr, "Can't open /sys/class/gpio/gpio107/value\n");
+   chip3 = gpiod_chip_open_by_number(3);
+   if (chip3 == NULL) {
+      fprintf(stderr, "Unable to open gpio chip\n");
       return 1;
    }
 
-   if ((lcdCmd_fd = open("/sys/class/gpio/gpio112/value",  O_RDWR|O_SYNC)) < 0) {
-   fprintf(stderr, "Can't open /sys/class/gpio/gpio112/value\n");
-      return 1;
+   lcd_rst = gpiod_chip_get_line(chip3, 11);
+   lcd_cmd = gpiod_chip_get_line(chip3, 16);
+   lcd_bklight = gpiod_chip_get_line(chip3, 25);
+   if (lcd_rst == NULL ||
+       lcd_cmd == NULL ||
+       lcd_bklight == NULL) {
+         fprintf(stderr, "Can't find gpio lines\n");
+         return 1;
    }
 
-   if ((lcdBacklight_fd = open("/sys/class/gpio/gpio121/value",  O_RDWR|O_SYNC)) < 0) {
-   fprintf(stderr, "Can't open /sys/class/gpio/gpio121/value\n");
-      return 1;
+   if (gpiod_line_request_output(lcd_rst, "lcd-helper", 0) ||
+       gpiod_line_request_output(lcd_cmd, "lcd-helper", 0) ||
+       gpiod_line_request_output(lcd_bklight, "lcd-helper", 0)) {
+         fprintf(stderr, "Unable to to request gpio lines\n");
+         return 1;
    }
 
    if((dir = opendir("/sys/class/graphics")) == NULL) {
@@ -371,6 +354,11 @@ int main(void) {
       displayUpdateFunction();
       close(fb_fd);
       close(spi_fd);
+
+      gpiod_line_release(lcd_rst);
+      gpiod_line_release(lcd_cmd);
+      gpiod_line_release(lcd_bklight);
+      gpiod_chip_close(chip3);
 
    } else {
       fprintf(stderr, "ERROR: Can't open fb device\n"
