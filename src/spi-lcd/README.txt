@@ -28,14 +28,6 @@ The bounce-test directory contains a simple program for rendering
 directly to the framebuffer.  
 
 
-Backlight on TS-7553-V2 is on GPIO #121.  This is enabled by the spi-helper
-application, but may also be controlled manually...
-
-  echo 121 > /sys/class/gpio/export
-  echo out > /sys/class/gpio/gpio121/direction
-  echo 1 >   /sys/class/gpio/gpio121/value # turns backlight on
-  echo 0 >   /sys/class/gpio/gpio121/value # turns backlight off
-  
 The kernel must have the ST7565P driver enabled for lcd-helper to work.
   modprobe ts-st7565p-fb
 
