@@ -20,6 +20,8 @@
  
 #include <linux/spi/spidev.h>
 
+#include "../../gpiod-helper.h"
+
 #define DEBUG 0
 
 #define SPI_DEVNAME   "/dev/spidev2.0"
@@ -58,10 +60,9 @@ static void sighup_handler(int signum) {
 
 static int checkHelperIsRunning(void);
 static int spi_fd;
-static struct gpiod_chip *chip3 = NULL;
-static struct gpiod_line *lcd_rst = NULL;
-static struct gpiod_line *lcd_cmd = NULL;
-static struct gpiod_line *lcd_bklight = NULL;
+static struct gpiod_line_request *lcd_rst = NULL;
+static struct gpiod_line_request *lcd_cmd = NULL;
+static struct gpiod_line_request *lcd_bklight = NULL;
 static unsigned char data[8][LCD_WIDTH];
 
 static unsigned int xRes, yRes, bitsPerPixel, stride;
@@ -101,27 +102,27 @@ static inline void clearPixel(unsigned int x, unsigned int y) {
 static void lcd_backlight(backlight_t state)
 {   
    if (state == BACKLIGHT_ON)
-      gpiod_line_set_value(lcd_bklight, 1);
+      gpiod_line_request_set_value(lcd_bklight, 25, GPIOD_LINE_VALUE_ACTIVE);
    else
-      gpiod_line_set_value(lcd_bklight, 0);
+      gpiod_line_request_set_value(lcd_bklight, 25, GPIOD_LINE_VALUE_INACTIVE);
 }      
 
 
 static void lcd_reset(lcd_reset_t state)
 {
    if (state == LCD_RESETN_ACTIVE)
-      gpiod_line_set_value(lcd_rst, 0);
+      gpiod_line_request_set_value(lcd_rst, 11, GPIOD_LINE_VALUE_INACTIVE);
    else
-      gpiod_line_set_value(lcd_rst, 1);
+      gpiod_line_request_set_value(lcd_rst, 11, GPIOD_LINE_VALUE_ACTIVE);
 }
 
 
 static void lcd_data_cmd_select(cmdData_t state)
 {
    if (state == DATA_LUN) 
-      gpiod_line_set_value(lcd_cmd, 1);
+      gpiod_line_request_set_value(lcd_cmd, 16, GPIOD_LINE_VALUE_ACTIVE);
    else
-      gpiod_line_set_value(lcd_cmd, 0);
+      gpiod_line_request_set_value(lcd_cmd, 16, GPIOD_LINE_VALUE_INACTIVE);
 }
 
 static void displayUpdateFunction(void) {
@@ -272,25 +273,21 @@ int main(void) {
       return 1;
    }
 
-   chip3 = gpiod_chip_open_by_number(3);
-   if (chip3 == NULL) {
-      fprintf(stderr, "Unable to open gpio chip\n");
-      return 1;
-   }
-
-   lcd_rst = gpiod_chip_get_line(chip3, 11);
-   lcd_cmd = gpiod_chip_get_line(chip3, 16);
-   lcd_bklight = gpiod_chip_get_line(chip3, 25);
+   lcd_rst = request_output_line("/dev/gpiochip3",
+					11,
+					GPIOD_LINE_VALUE_INACTIVE,
+					"lcd-helper");
+   lcd_cmd = request_output_line("/dev/gpiochip3",
+					16,
+					GPIOD_LINE_VALUE_INACTIVE,
+					"lcd-helper");
+   lcd_bklight = request_output_line("/dev/gpiochip3",
+					25,
+					GPIOD_LINE_VALUE_INACTIVE,
+					"lcd-helper");
    if (lcd_rst == NULL ||
        lcd_cmd == NULL ||
        lcd_bklight == NULL) {
-         fprintf(stderr, "Can't find gpio lines\n");
-         return 1;
-   }
-
-   if (gpiod_line_request_output(lcd_rst, "lcd-helper", 0) ||
-       gpiod_line_request_output(lcd_cmd, "lcd-helper", 0) ||
-       gpiod_line_request_output(lcd_bklight, "lcd-helper", 0)) {
          fprintf(stderr, "Unable to to request gpio lines\n");
          return 1;
    }
@@ -355,10 +352,9 @@ int main(void) {
       close(fb_fd);
       close(spi_fd);
 
-      gpiod_line_release(lcd_rst);
-      gpiod_line_release(lcd_cmd);
-      gpiod_line_release(lcd_bklight);
-      gpiod_chip_close(chip3);
+      gpiod_line_request_release(lcd_rst);
+      gpiod_line_request_release(lcd_cmd);
+      gpiod_line_request_release(lcd_bklight);
 
    } else {
       fprintf(stderr, "ERROR: Can't open fb device\n"

@@ -12,10 +12,12 @@
 #include <getopt.h>
 #include <gpiod.h>
 
-#define STRAP0 87
-#define STRAP1 88
-#define STRAP2 91
-#define STRAP3 92
+#include "gpiod-helper.h"
+
+#define STRAP0	23
+#define STRAP1	24
+#define STRAP2	27
+#define STRAP3	38
 
 const char copyright[] = "Copyright (c) embeddedTS - " __DATE__ " - "
   GITCOMMIT;
@@ -41,53 +43,47 @@ int get_model()
 int do_info(void)
 {
 	uint8_t opts = 0;
-	struct gpiod_chip *chip2 = NULL;
-	struct gpiod_line *strap0 = NULL;
-	struct gpiod_line *strap1 = NULL;
-	struct gpiod_line *strap2 = NULL;
-	struct gpiod_line *strap3 = NULL;
+	int i;
+	struct gpiod_line_request *strap[4] = {NULL};
+	int line[4] = {STRAP0, STRAP1, STRAP2, STRAP3};
+	int ret = 0;
+	enum gpiod_line_value value;
 
-	chip2 = gpiod_chip_open_by_number(2);
-	if (chip2 == NULL) {
-		fprintf(stderr, "Unable to open gpio chip 2");
-		return -1;
-	}
-	strap0 = gpiod_chip_get_line(chip2, 23);
-	strap1 = gpiod_chip_get_line(chip2, 24);
-	strap2 = gpiod_chip_get_line(chip2, 27);
-	strap3 = gpiod_chip_get_line(chip2, 28);
-	if (strap0 == NULL ||
-	    strap1 == NULL ||
-	    strap2 == NULL ||
-	    strap3 == NULL) {
-		fprintf(stderr, "Unable find GPIO pins for opts\n");
-		return -1;
-	}
-
-	if (gpiod_line_request_input(strap0, "tshwctl") ||
-	    gpiod_line_request_input(strap1, "tshwctl") ||
-	    gpiod_line_request_input(strap2, "tshwctl") ||
-	    gpiod_line_request_input(strap3, "tshwctl")) {
+	strap[0] = request_input_line("/dev/gpiochip2", line[0], "tshwctl");
+	strap[1] = request_input_line("/dev/gpiochip2", line[1], "tshwctl");
+	strap[2] = request_input_line("/dev/gpiochip2", line[2], "tshwctl");
+	strap[3] = request_input_line("/dev/gpiochip2", line[3], "tshwctl");
+	if (strap[0] == NULL ||
+	    strap[1] == NULL ||
+	    strap[2] == NULL ||
+	    strap[3] == NULL) {
 		fprintf(stderr, "Unable to request GPIO pins for opts\n");
-		return -1;
+		ret = -1;
+		goto out;
 	}
 
-	opts |= (gpiod_line_get_value(strap0) << 0);
-	opts |= (gpiod_line_get_value(strap1) << 1);
-	opts |= (gpiod_line_get_value(strap2) << 2);
-	opts |= (gpiod_line_get_value(strap3) << 3);
+	for (i = 0; i < 4; i++) {
+		value = gpiod_line_request_get_value(strap[i], line[i]);
+		if (value == GPIOD_LINE_VALUE_ERROR) {
+			fprintf(stderr, "Error reading line %d\n", line[i]);
+			ret = -1;
+			goto out;
+		}
 
-	gpiod_line_release(strap0);
-	gpiod_line_release(strap1);
-	gpiod_line_release(strap2);
-	gpiod_line_release(strap3);
-	gpiod_chip_close(chip2);
+		if (value == GPIOD_LINE_VALUE_ACTIVE)
+			opts |= (1 << i);
+	}
 
 	printf("model=%X\n", get_model());
 	printf("boardopt=%d\n", opts);
 
-	return 0;
+out:
+	for (i = 0; i < 4; i++) {
+		if (strap[i])
+			gpiod_line_request_release(strap[i]);
+	}
 
+	return ret;
 }
 
 static void usage(char **argv) {
