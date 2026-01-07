@@ -14,6 +14,11 @@ AC_PROG_CC
 AC_SEARCH_LIBS([cairo_create], [cairo], [],
 		[AC_MSG_FAILURE([libcairo not found])])
 
+
+PKG_CHECK_MODULES([LIBGPIOD], [libgpiod >= 2.2], [], [
+  AC_MSG_ERROR([libgpiod is required but was not found])
+])
+
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h sys/ioctl.h unistd.h])
 
