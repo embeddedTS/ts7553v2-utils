@@ -4,12 +4,11 @@
 RESET_PCT=90
 
 # Set up the power_fail input pin to use gpiomon
-powerfail_gpio="gpiochip4 0"
+powerfail_gpio="POWER_FAIL#"
 supercap_pct=0
 
 while true; do
-    # shellcheck disable=SC2086
-    POWER_FAIL=$(gpioget ${powerfail_gpio})
+    POWER_FAIL=$(gpioget --numeric "${powerfail_gpio}")
     if [ "${POWER_FAIL}" -eq 1 ]; then
         eval "$(tsmicroctl -i)"
         echo "Supercaps at ${supercap_pct}"
@@ -19,10 +18,10 @@ while true; do
             # devices, or start other shutdown procedures required.
             # For example:
             # Turn off cell modem:
-            #   gpioset 0 8=0
+            #   gpioset -t0 MODEM_5V_EN=0
             #
             # Disable relay:
-            #   gpioset 4 8=0
+            #   gpioset -t0 RELAY_EN=0
             #
             # The wall command can be removed if wanted.
 
@@ -33,7 +32,6 @@ while true; do
         fi
         sleep 0.5
     else
-        # shellcheck disable=SC2086
-        gpiomon --num-events=1 --rising-edge ${powerfail_gpio} >/dev/null 2>&1
+        gpiomon --num-events=1 --quiet --edges rising "${powerfail_gpio}"
     fi
 done
